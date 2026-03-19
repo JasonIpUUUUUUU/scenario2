@@ -7,7 +7,23 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+* {
+  box-sizing: border-box;
+}
+
+/* FullCalendar customization */
+.fc .fc-button-primary {
+  background-color: #1a73e8;
+  border-color: #1a73e8;
+}
+
+.fc .fc-button-primary:hover {
+  background-color: #0d47a1;
+  border-color: #0d47a1;
+}
+
+.fc .fc-button-primary:disabled {
+  background-color: #1a73e8;
+  border-color: #1a73e8;
+  opacity: 0.65;
 }
