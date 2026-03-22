@@ -1,80 +1,137 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ChakraProvider, Box } from '@chakra-ui/react';
-import { system } from './theme';
+import { ChakraProvider, Box, Spinner, Center } from '@chakra-ui/react';
+import { theme } from './theme';
 import { Toaster } from './components/ui/toaster';
+import { Calendar } from './components/Calendar';
+import { Sidebar } from './components/Sidebar';
+import { PendingInvites } from './components/PendingInvites';
+import { CreateEventButton } from './components/CreateEventButton';
+import { GroupView } from './components/GroupView';
+import { CreateEventModal } from './components/CreateEventModal';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
-import { Calendar } from './pages/Calendar';
 import { useAuthStore } from './store/authStore';
+import { authApi } from './api/client';
 
 const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
+  defaultOptions: { 
+    queries: { 
+      retry: 1, 
       refetchOnWindowFocus: false,
-    },
+      staleTime: 1000 * 60 * 5, // 5 minutes
+    } 
   },
 });
 
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  
+type View = 'home' | 'calendar' | 'groups' | 'settings';
+
+function AppContent() {
+  const [activeView, setActiveView] = useState<View>('calendar');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const { user, isAuthenticated, setAuth, logout, setLoading, isLoading } = useAuthStore();
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      console.log('🔍 Checking authentication...');
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        console.log('❌ No token found');
+        setLoading(false);
+        setIsAuthChecking(false);
+        return;
+      }
+
+      try {
+        console.log('✅ Token found, verifying with server...');
+        const response = await authApi.getMe();
+        console.log('✅ User authenticated:', response.user.name);
+        setAuth(response.user, token);
+      } catch (error) {
+        console.error('❌ Auth check failed:', error);
+        // Token is invalid, clear it
+        localStorage.removeItem('token');
+        logout();
+      } finally {
+        setIsAuthChecking(false);
+      }
+    };
+
+    checkAuth();
+  }, [setAuth, logout, setLoading]);
+
+  // Show loading spinner while checking auth
+  if (isAuthChecking || isLoading) {
+    console.log('⏳ Loading state:', { isAuthChecking, isLoading });
+    return (
+      <Center h="100vh" bg="var(--color-base)">
+        <Spinner size="xl" color="#d4775c" thickness="4px" />
+      </Center>
+    );
+  }
+
+  // If not authenticated, redirect to login
   if (!isAuthenticated) {
+    console.log('🚪 Not authenticated, redirecting to login');
     return <Navigate to="/login" replace />;
   }
-  
-  return <>{children}</>;
-};
 
-const PublicRoute = ({ children }: { children: React.ReactNode }) => {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  
-  if (isAuthenticated) {
-    return <Navigate to="/calendar" replace />;
-  }
-  
-  return <>{children}</>;
-};
+  console.log('🎉 User authenticated, showing app');
+
+  return (
+    <div className="min-h-screen bg-base flex items-center justify-center p-6 relative noise-texture">
+      <div className="w-[96%] max-w-[1680px] h-[92vh] bg-surface rounded-[32px] border border-border-medium flex overflow-hidden relative"
+        style={{ boxShadow: '0 0 0 1px rgba(255,245,230,0.03), 0 40px 80px -20px rgba(0,0,0,0.6)' }}>
+        <Sidebar activeView={activeView} onNavigate={setActiveView} />
+        <main className="flex-1 flex flex-col overflow-hidden">
+          {activeView === 'calendar' && <Calendar />}
+          {activeView === 'groups' && <GroupView />}
+          {activeView === 'home' && <Calendar />}
+          {activeView === 'settings' && (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <h2 className="text-2xl font-display text-text-primary mb-2">Settings</h2>
+                <p className="text-text-secondary">Coming soon...</p>
+                <button 
+                  onClick={() => {
+                    logout();
+                    window.location.href = '/login';
+                  }} 
+                  className="mt-4 px-4 py-2 bg-accent hover:bg-accent-hover rounded-lg text-white transition-colors">
+                  Logout
+                </button>
+              </div>
+            </div>
+          )}
+        </main>
+        {activeView !== 'groups' && (
+          <div className="w-[300px] p-6 flex flex-col gap-5 border-l border-border-subtle">
+            <CreateEventButton onClick={() => setIsModalOpen(true)} />
+            <PendingInvites />
+          </div>
+        )}
+      </div>
+      <CreateEventModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+    </div>
+  );
+}
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ChakraProvider value={system}>
+      <ChakraProvider theme={theme}>
         <Toaster />
-        <Box minH="100vh" bg="gray.50">
-          <BrowserRouter>
-            <Routes>
-              <Route
-                path="/login"
-                element={
-                  <PublicRoute>
-                    <Login />
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/register"
-                element={
-                  <PublicRoute>
-                    <Register />
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/calendar"
-                element={
-                  <ProtectedRoute>
-                    <Calendar />
-                  </ProtectedRoute>
-                }
-              />
-              <Route path="/" element={<Navigate to="/calendar" replace />} />
-              <Route path="*" element={<Navigate to="/calendar" replace />} />
-            </Routes>
-          </BrowserRouter>
-        </Box>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/calendar" element={<AppContent />} />
+            <Route path="/" element={<Navigate to="/calendar" replace />} />
+          </Routes>
+        </BrowserRouter>
       </ChakraProvider>
     </QueryClientProvider>
   );

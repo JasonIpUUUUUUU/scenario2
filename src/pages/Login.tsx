@@ -4,64 +4,50 @@ import {
   Box,
   Button,
   Container,
-  Field,
+  FormControl,
+  FormLabel,
+  FormErrorMessage,
+  Heading,
   Input,
   Text,
   VStack,
-  Card,
+  useToast,
 } from '@chakra-ui/react';
-import { toaster } from '@/components/ui/toaster';
 import { authApi } from '../api/client';
 import { useAuthStore } from '../store/authStore';
 
 export const Login = () => {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const navigate = useNavigate();
+  const toast = useToast();
   const setAuth = useAuthStore((state) => state.setAuth);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    
-    if (!formData.email) {
-      newErrors.email = 'Email is required';
-    }
-    
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    }
-    
+    if (!formData.email) newErrors.email = 'Email is required';
+    if (!formData.password) newErrors.password = 'Password is required';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-    
+    if (!validateForm()) return;
     setIsLoading(true);
-    
     try {
       const response = await authApi.login(formData);
       const userData = await authApi.getMe();
       setAuth(userData.user, response.token);
-      
-      toaster.success({
-        title: 'Login successful!',
-        description: 'Welcome back!',
-      });
+      toast({ title: 'Login successful!', status: 'success', duration: 3000 });
       navigate('/calendar');
     } catch (error: any) {
-      toaster.error({
+      toast({
         title: 'Login failed',
         description: error.response?.data?.error?.message || 'Invalid email or password',
+        status: 'error',
+        duration: 5000,
       });
     } finally {
       setIsLoading(false);
@@ -69,75 +55,39 @@ export const Login = () => {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-    if (errors[e.target.name]) {
-      setErrors({
-        ...errors,
-        [e.target.name]: '',
-      });
-    }
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    if (errors[e.target.name]) setErrors({ ...errors, [e.target.name]: '' });
   };
 
   return (
     <Container maxW="lg" py={12}>
-      <VStack gap={8}>
-        <VStack gap={2} textAlign="center">
-          <Text textStyle="4xl" fontWeight="bold">Welcome Back</Text>
+      <VStack spacing={8}>
+        <VStack spacing={2} textAlign="center">
+          <Heading size="2xl">Welcome Back</Heading>
           <Text color="gray.500">Sign in to your account</Text>
         </VStack>
-
-        <Card.Root width="full">
-          <Card.Body>
-            <form onSubmit={handleSubmit}>
-              <VStack gap={4}>
-                <Field.Root invalid={!!errors.email}>
-                  <Field.Label>Email</Field.Label>
-                  <Input
-                    name="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="you@example.com"
-                  />
-                  <Field.ErrorText>{errors.email}</Field.ErrorText>
-                </Field.Root>
-
-                <Field.Root invalid={!!errors.password}>
-                  <Field.Label>Password</Field.Label>
-                  <Input
-                    name="password"
-                    type="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    placeholder="********"
-                  />
-                  <Field.ErrorText>{errors.password}</Field.ErrorText>
-                </Field.Root>
-
-                <Button
-                  type="submit"
-                  colorScheme="brand"
-                  size="lg"
-                  width="full"
-                  loading={isLoading}
-                  mt={4}
-                >
-                  Sign In
-                </Button>
-              </VStack>
-            </form>
-
-            <Text mt={4} textAlign="center">
-              Don't have an account?{' '}
-              <Link to="/register" style={{ color: '#1a73e8' }}>
-                Sign up
-              </Link>
-            </Text>
-          </Card.Body>
-        </Card.Root>
+        <Box w="full" bg="white" p={8} borderRadius="lg" shadow="sm">
+          <form onSubmit={handleSubmit}>
+            <VStack spacing={4}>
+              <FormControl isInvalid={!!errors.email}>
+                <FormLabel>Email</FormLabel>
+                <Input name="email" type="email" value={formData.email} onChange={handleChange} />
+                <FormErrorMessage>{errors.email}</FormErrorMessage>
+              </FormControl>
+              <FormControl isInvalid={!!errors.password}>
+                <FormLabel>Password</FormLabel>
+                <Input name="password" type="password" value={formData.password} onChange={handleChange} />
+                <FormErrorMessage>{errors.password}</FormErrorMessage>
+              </FormControl>
+              <Button type="submit" colorScheme="brand" size="lg" w="full" isLoading={isLoading} mt={4}>
+                Sign In
+              </Button>
+            </VStack>
+          </form>
+          <Text mt={4} textAlign="center">
+            Don't have an account? <Link to="/register" style={{ color: '#1a73e8' }}>Sign up</Link>
+          </Text>
+        </Box>
       </VStack>
     </Container>
   );

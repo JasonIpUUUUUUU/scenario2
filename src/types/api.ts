@@ -1,5 +1,3 @@
-// This file matches your backend API specification exactly
-
 export interface User {
   id: string;
   email: string;
@@ -59,7 +57,7 @@ export interface GroupEventParticipant {
 export interface GroupPrivacy {
   group_id: string;
   user_id: string;
-  share_level: number;  // 0-3 scale
+  share_level: number;
   updated_at: string;
 }
 
@@ -84,7 +82,6 @@ export interface AvailabilitySlot {
   }>;
 }
 
-// API Request/Response types
 export interface LoginRequest {
   email: string;
   password: string;
@@ -104,12 +101,4 @@ export interface RegisterRequest {
 export interface RegisterResponse {
   user: User;
   token: string;
-}
-
-export interface ApiError {
-  error: {
-    code: string;
-    message: string;
-    details?: Record<string, string>;
-  };
 }
