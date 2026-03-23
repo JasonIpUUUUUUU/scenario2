@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ChakraProvider, Box, Spinner, Center } from '@chakra-ui/react';
 import { theme } from './theme';
@@ -20,7 +20,7 @@ const queryClient = new QueryClient({
     queries: { 
       retry: 1, 
       refetchOnWindowFocus: false,
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      staleTime: 1000 * 60 * 5,
     } 
   },
 });
@@ -30,8 +30,8 @@ type View = 'home' | 'calendar' | 'groups' | 'settings';
 function AppContent() {
   const [activeView, setActiveView] = useState<View>('calendar');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
-  const { user, isAuthenticated, setAuth, logout, setLoading, isLoading } = useAuthStore();
+  const [isInitialized, setIsInitialized] = useState(false);
+  const { user, isAuthenticated, isLoading, setAuth, logout, setLoading } = useAuthStore();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -41,7 +41,7 @@ function AppContent() {
       if (!token) {
         console.log('❌ No token found');
         setLoading(false);
-        setIsAuthChecking(false);
+        setIsInitialized(true);
         return;
       }
 
@@ -52,11 +52,10 @@ function AppContent() {
         setAuth(response.user, token);
       } catch (error) {
         console.error('❌ Auth check failed:', error);
-        // Token is invalid, clear it
         localStorage.removeItem('token');
         logout();
       } finally {
-        setIsAuthChecking(false);
+        setIsInitialized(true);
       }
     };
 
@@ -64,8 +63,7 @@ function AppContent() {
   }, [setAuth, logout, setLoading]);
 
   // Show loading spinner while checking auth
-  if (isAuthChecking || isLoading) {
-    console.log('⏳ Loading state:', { isAuthChecking, isLoading });
+  if (!isInitialized || isLoading) {
     return (
       <Center h="100vh" bg="var(--color-base)">
         <Spinner size="xl" color="#d4775c" thickness="4px" />
@@ -82,40 +80,45 @@ function AppContent() {
   console.log('🎉 User authenticated, showing app');
 
   return (
-    <div className="min-h-screen bg-base flex items-center justify-center p-6 relative noise-texture">
-      <div className="w-[96%] max-w-[1680px] h-[92vh] bg-surface rounded-[32px] border border-border-medium flex overflow-hidden relative"
-        style={{ boxShadow: '0 0 0 1px rgba(255,245,230,0.03), 0 40px 80px -20px rgba(0,0,0,0.6)' }}>
-        <Sidebar activeView={activeView} onNavigate={setActiveView} />
-        <main className="flex-1 flex flex-col overflow-hidden">
-          {activeView === 'calendar' && <Calendar />}
-          {activeView === 'groups' && <GroupView />}
-          {activeView === 'home' && <Calendar />}
-          {activeView === 'settings' && (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center">
-                <h2 className="text-2xl font-display text-text-primary mb-2">Settings</h2>
-                <p className="text-text-secondary">Coming soon...</p>
-                <button 
-                  onClick={() => {
-                    logout();
-                    window.location.href = '/login';
-                  }} 
-                  className="mt-4 px-4 py-2 bg-accent hover:bg-accent-hover rounded-lg text-white transition-colors">
-                  Logout
-                </button>
+    <>
+      <div className="min-h-screen bg-base flex items-center justify-center p-6 relative noise-texture">
+        <div 
+          className="w-[96%] max-w-[1680px] h-[92vh] bg-surface rounded-[32px] border border-border-medium flex overflow-hidden relative"
+          style={{ boxShadow: '0 0 0 1px rgba(255,245,230,0.03), 0 40px 80px -20px rgba(0,0,0,0.6)' }}
+        >
+          <Sidebar activeView={activeView} onNavigate={setActiveView} />
+          <main className="flex-1 flex flex-col overflow-hidden">
+            {activeView === 'calendar' && <Calendar />}
+            {activeView === 'groups' && <GroupView />}
+            {activeView === 'home' && <Calendar />}
+            {activeView === 'settings' && (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <h2 className="text-2xl font-display text-text-primary mb-2">Settings</h2>
+                  <p className="text-text-secondary">Coming soon...</p>
+                  <button 
+                    onClick={() => {
+                      logout();
+                      window.location.href = '/login';
+                    }} 
+                    className="mt-4 px-4 py-2 bg-accent hover:bg-accent-hover rounded-lg text-white transition-colors"
+                  >
+                    Logout
+                  </button>
+                </div>
               </div>
+            )}
+          </main>
+          {activeView !== 'groups' && (
+            <div className="w-[300px] p-6 flex flex-col gap-5 border-l border-border-subtle">
+              <CreateEventButton onClick={() => setIsModalOpen(true)} />
+              <PendingInvites />
             </div>
           )}
-        </main>
-        {activeView !== 'groups' && (
-          <div className="w-[300px] p-6 flex flex-col gap-5 border-l border-border-subtle">
-            <CreateEventButton onClick={() => setIsModalOpen(true)} />
-            <PendingInvites />
-          </div>
-        )}
+        </div>
       </div>
       <CreateEventModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-    </div>
+    </>
   );
 }
 

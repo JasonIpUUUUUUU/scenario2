@@ -36,13 +36,36 @@ export const Login = () => {
     e.preventDefault();
     if (!validateForm()) return;
     setIsLoading(true);
+    
     try {
+      console.log('📝 Attempting login for:', formData.email);
       const response = await authApi.login(formData);
+      console.log('✅ Login response received, token:', response.token.substring(0, 20) + '...');
+      
+      // Store token in localStorage
+      localStorage.setItem('token', response.token);
+      
+      // Fetch user data
+      console.log('📝 Fetching user data...');
       const userData = await authApi.getMe();
+      console.log('✅ User data received:', userData.user);
+      
+      // Set auth state
       setAuth(userData.user, response.token);
-      toast({ title: 'Login successful!', status: 'success', duration: 3000 });
-      navigate('/calendar');
+      
+      toast({
+        title: 'Login successful!',
+        description: `Welcome back, ${userData.user.name}!`,
+        status: 'success',
+        duration: 3000,
+      });
+      
+      // Navigate to calendar
+      console.log('🚀 Navigating to calendar...');
+      navigate('/calendar', { replace: true });
+      
     } catch (error: any) {
+      console.error('❌ Login error:', error);
       toast({
         title: 'Login failed',
         description: error.response?.data?.error?.message || 'Invalid email or password',
@@ -71,15 +94,34 @@ export const Login = () => {
             <VStack spacing={4}>
               <FormControl isInvalid={!!errors.email}>
                 <FormLabel>Email</FormLabel>
-                <Input name="email" type="email" value={formData.email} onChange={handleChange} />
+                <Input 
+                  name="email" 
+                  type="email" 
+                  value={formData.email} 
+                  onChange={handleChange}
+                  placeholder="you@example.com"
+                />
                 <FormErrorMessage>{errors.email}</FormErrorMessage>
               </FormControl>
               <FormControl isInvalid={!!errors.password}>
                 <FormLabel>Password</FormLabel>
-                <Input name="password" type="password" value={formData.password} onChange={handleChange} />
+                <Input 
+                  name="password" 
+                  type="password" 
+                  value={formData.password} 
+                  onChange={handleChange}
+                  placeholder="********"
+                />
                 <FormErrorMessage>{errors.password}</FormErrorMessage>
               </FormControl>
-              <Button type="submit" colorScheme="brand" size="lg" w="full" isLoading={isLoading} mt={4}>
+              <Button 
+                type="submit" 
+                colorScheme="brand" 
+                size="lg" 
+                w="full" 
+                isLoading={isLoading}
+                mt={4}
+              >
                 Sign In
               </Button>
             </VStack>
