@@ -4,15 +4,14 @@ import {
   Box,
   Button,
   Container,
-  FormControl,
-  FormLabel,
-  FormErrorMessage,
-  Heading,
+  Field,
   Input,
   Text,
   VStack,
-  useToast,
+  Heading,
+  Center,
 } from '@chakra-ui/react';
+import { toaster } from '../components/ui/toaster';
 import { authApi } from '../api/client';
 import { useAuthStore } from '../store/authStore';
 
@@ -21,7 +20,6 @@ export const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const navigate = useNavigate();
-  const toast = useToast();
   const setAuth = useAuthStore((state) => state.setAuth);
 
   const validateForm = () => {
@@ -38,39 +36,23 @@ export const Login = () => {
     setIsLoading(true);
     
     try {
-      console.log('📝 Attempting login for:', formData.email);
       const response = await authApi.login(formData);
-      console.log('✅ Login response received, token:', response.token.substring(0, 20) + '...');
-      
-      // Store token in localStorage
       localStorage.setItem('token', response.token);
-      
-      // Fetch user data
-      console.log('📝 Fetching user data...');
       const userData = await authApi.getMe();
-      console.log('✅ User data received:', userData.user);
-      
-      // Set auth state
       setAuth(userData.user, response.token);
       
-      toast({
+      toaster.create({
         title: 'Login successful!',
         description: `Welcome back, ${userData.user.name}!`,
-        status: 'success',
-        duration: 3000,
+        type: 'success',
       });
       
-      // Navigate to calendar
-      console.log('🚀 Navigating to calendar...');
       navigate('/calendar', { replace: true });
-      
     } catch (error: any) {
-      console.error('❌ Login error:', error);
-      toast({
+      toaster.create({
         title: 'Login failed',
         description: error.response?.data?.error?.message || 'Invalid email or password',
-        status: 'error',
-        duration: 5000,
+        type: 'error',
       });
     } finally {
       setIsLoading(false);
@@ -83,54 +65,101 @@ export const Login = () => {
   };
 
   return (
-    <Container maxW="lg" py={12}>
-      <VStack spacing={8}>
-        <VStack spacing={2} textAlign="center">
-          <Heading size="2xl">Welcome Back</Heading>
-          <Text color="gray.500">Sign in to your account</Text>
+    <Center minH="100vh" bg="#0f0e0d">
+      <Container maxW="lg" py={12}>
+        <VStack gap={8}>
+          <VStack gap={2} textAlign="center">
+            <Heading 
+              size="2xl" 
+              color="#f0ebe3"
+              fontFamily="'Cormorant Garamond', serif"
+              fontWeight="semibold"
+              letterSpacing="-0.02em"
+            >
+              Welcome Back
+            </Heading>
+            <Text color="#968f84">Sign in to your account</Text>
+          </VStack>
+          
+          <Box 
+            w="full" 
+            bg="#1a1917" 
+            p={8} 
+            borderRadius="24px" 
+            border="1px solid rgba(255,245,230,0.06)"
+            boxShadow="0 4px 24px -8px rgba(0,0,0,0.3)"
+          >
+            <form onSubmit={handleSubmit}>
+              <VStack gap={5}>
+                <Field.Root invalid={!!errors.email}>
+                  <Field.Label color="#968f84" fontSize="sm">Email</Field.Label>
+                  <Input
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="you@example.com"
+                    bg="#252320"
+                    border="1px solid rgba(255,245,230,0.08)"
+                    _hover={{ borderColor: 'rgba(255,245,230,0.16)' }}
+                    _focus={{ borderColor: '#d4775c', boxShadow: '0 0 0 1px #d4775c' }}
+                    color="#f0ebe3"
+                    _placeholder={{ color: '#5c574f' }}
+                    height="48px"
+                    borderRadius="12px"
+                  />
+                  <Field.ErrorText color="#d4775c">{errors.email}</Field.ErrorText>
+                </Field.Root>
+
+                <Field.Root invalid={!!errors.password}>
+                  <Field.Label color="#968f84" fontSize="sm">Password</Field.Label>
+                  <Input
+                    name="password"
+                    type="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="********"
+                    bg="#252320"
+                    border="1px solid rgba(255,245,230,0.08)"
+                    _hover={{ borderColor: 'rgba(255,245,230,0.16)' }}
+                    _focus={{ borderColor: '#d4775c', boxShadow: '0 0 0 1px #d4775c' }}
+                    color="#f0ebe3"
+                    _placeholder={{ color: '#5c574f' }}
+                    height="48px"
+                    borderRadius="12px"
+                  />
+                  <Field.ErrorText color="#d4775c">{errors.password}</Field.ErrorText>
+                </Field.Root>
+
+                <Button
+                  type="submit"
+                  width="full"
+                  height="48px"
+                  borderRadius="12px"
+                  fontWeight="500"
+                  fontSize="15px"
+                  bg="#d4775c"
+                  _hover={{ bg: '#e08a6f' }}
+                  _active={{ transform: 'scale(0.98)' }}
+                  transition="all 0.2s"
+                  loading={isLoading}
+                  mt={2}
+                  color="white"
+                >
+                  Sign In
+                </Button>
+              </VStack>
+            </form>
+
+            <Text mt={6} textAlign="center" color="#5c574f" fontSize="sm">
+              Don't have an account?{' '}
+              <Link to="/register" style={{ color: '#d4775c', fontWeight: '500' }}>
+                Sign up
+              </Link>
+            </Text>
+          </Box>
         </VStack>
-        <Box w="full" bg="white" p={8} borderRadius="lg" shadow="sm">
-          <form onSubmit={handleSubmit}>
-            <VStack spacing={4}>
-              <FormControl isInvalid={!!errors.email}>
-                <FormLabel>Email</FormLabel>
-                <Input 
-                  name="email" 
-                  type="email" 
-                  value={formData.email} 
-                  onChange={handleChange}
-                  placeholder="you@example.com"
-                />
-                <FormErrorMessage>{errors.email}</FormErrorMessage>
-              </FormControl>
-              <FormControl isInvalid={!!errors.password}>
-                <FormLabel>Password</FormLabel>
-                <Input 
-                  name="password" 
-                  type="password" 
-                  value={formData.password} 
-                  onChange={handleChange}
-                  placeholder="********"
-                />
-                <FormErrorMessage>{errors.password}</FormErrorMessage>
-              </FormControl>
-              <Button 
-                type="submit" 
-                colorScheme="brand" 
-                size="lg" 
-                w="full" 
-                isLoading={isLoading}
-                mt={4}
-              >
-                Sign In
-              </Button>
-            </VStack>
-          </form>
-          <Text mt={4} textAlign="center">
-            Don't have an account? <Link to="/register" style={{ color: '#1a73e8' }}>Sign up</Link>
-          </Text>
-        </Box>
-      </VStack>
-    </Container>
+      </Container>
+    </Center>
   );
 };

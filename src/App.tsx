@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ChakraProvider, Box, Spinner, Center } from '@chakra-ui/react';
-import { theme } from './theme';
+import { system } from './theme';
 import { Toaster } from './components/ui/toaster';
 import { Calendar } from './components/Calendar';
 import { Sidebar } from './components/Sidebar';
@@ -16,12 +16,12 @@ import { useAuthStore } from './store/authStore';
 import { authApi } from './api/client';
 
 const queryClient = new QueryClient({
-  defaultOptions: { 
-    queries: { 
-      retry: 1, 
+  defaultOptions: {
+    queries: {
+      retry: 1,
       refetchOnWindowFocus: false,
       staleTime: 1000 * 60 * 5,
-    } 
+    },
   },
 });
 
@@ -35,23 +35,17 @@ function AppContent() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      console.log('🔍 Checking authentication...');
       const token = localStorage.getItem('token');
-      
       if (!token) {
-        console.log('❌ No token found');
         setLoading(false);
         setIsInitialized(true);
         return;
       }
 
       try {
-        console.log('✅ Token found, verifying with server...');
         const response = await authApi.getMe();
-        console.log('✅ User authenticated:', response.user.name);
         setAuth(response.user, token);
       } catch (error) {
-        console.error('❌ Auth check failed:', error);
         localStorage.removeItem('token');
         logout();
       } finally {
@@ -62,29 +56,26 @@ function AppContent() {
     checkAuth();
   }, [setAuth, logout, setLoading]);
 
-  // Show loading spinner while checking auth
   if (!isInitialized || isLoading) {
     return (
-      <Center h="100vh" bg="var(--color-base)">
-        <Spinner size="xl" color="#d4775c" thickness="4px" />
+      <Center h="100vh" bg="#0f0e0d">
+        <Spinner size="xl" color="#d4775c" textDecorationThickness="4px" />
       </Center>
     );
   }
 
-  // If not authenticated, redirect to login
   if (!isAuthenticated) {
-    console.log('🚪 Not authenticated, redirecting to login');
     return <Navigate to="/login" replace />;
   }
-
-  console.log('🎉 User authenticated, showing app');
 
   return (
     <>
       <div className="min-h-screen bg-base flex items-center justify-center p-6 relative noise-texture">
-        <div 
+        <div
           className="w-[96%] max-w-[1680px] h-[92vh] bg-surface rounded-[32px] border border-border-medium flex overflow-hidden relative"
-          style={{ boxShadow: '0 0 0 1px rgba(255,245,230,0.03), 0 40px 80px -20px rgba(0,0,0,0.6)' }}
+          style={{
+            boxShadow: '0 0 0 1px rgba(255,245,230,0.03), 0 40px 80px -20px rgba(0,0,0,0.6)',
+          }}
         >
           <Sidebar activeView={activeView} onNavigate={setActiveView} />
           <main className="flex-1 flex flex-col overflow-hidden">
@@ -96,11 +87,11 @@ function AppContent() {
                 <div className="text-center">
                   <h2 className="text-2xl font-display text-text-primary mb-2">Settings</h2>
                   <p className="text-text-secondary">Coming soon...</p>
-                  <button 
+                  <button
                     onClick={() => {
                       logout();
                       window.location.href = '/login';
-                    }} 
+                    }}
                     className="mt-4 px-4 py-2 bg-accent hover:bg-accent-hover rounded-lg text-white transition-colors"
                   >
                     Logout
@@ -125,7 +116,7 @@ function AppContent() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ChakraProvider theme={theme}>
+      <ChakraProvider value={system}>
         <Toaster />
         <BrowserRouter>
           <Routes>
