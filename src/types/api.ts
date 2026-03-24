@@ -96,6 +96,7 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   token: string;
+  user: User;
 }
 
 export interface RegisterRequest {
