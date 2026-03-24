@@ -39,7 +39,11 @@ export const Login = () => {
       const response = await authApi.login(formData);
       localStorage.setItem('token', response.token);
       const userData = await authApi.getMe();
-      setAuth(userData.user, response.token);
+      try {
+        setAuth(userData.user, response.token);
+      } catch {
+        toaster.error({ title: 'Failed to fetch user' });
+      }
       
       toaster.create({
         title: 'Login successful!',

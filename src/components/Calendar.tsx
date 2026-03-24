@@ -2,12 +2,16 @@ import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { WeekView } from './WeekView';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { CreateEventModal} from './CreateEventModal';
+
 
 const viewModes = ['Day', 'Week', 'Month'];
 
 export function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentView, setCurrentView] = useState<'Day' | 'Week' | 'Month'>('Week');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   const handlePrevious = () => {
     if (currentView === 'Month') {
@@ -88,7 +92,11 @@ export function Calendar() {
         </div>
       </div>
       <div className="flex-1 overflow-auto px-8 pb-6 scrollbar-hide">
-        {currentView === 'Week' && <WeekView currentDate={currentDate} />}
+        {currentView === 'Week' && <WeekView currentDate={currentDate}
+                                              onTimeSlotClick = {(date: Date) => {
+                                                setSelectedDate(date);
+                                                setIsModalOpen(true);
+                                              }} />}
         {currentView === 'Month' && (
           <div className="text-center text-text-secondary py-20">
             Month view coming soon...
@@ -100,6 +108,11 @@ export function Calendar() {
           </div>
         )}
       </div>
+      <CreateEventModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        initialDate={selectedDate}
+        />
     </div>
   );
 }

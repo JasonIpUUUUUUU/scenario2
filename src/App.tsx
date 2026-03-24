@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ChakraProvider, Box, Spinner, Center } from '@chakra-ui/react';
@@ -13,6 +13,7 @@ import { CreateEventModal } from './components/CreateEventModal';
 import { Settings } from './pages/Settings';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
+import { Groups } from './pages/Groups';
 import { useAuthStore } from './store/authStore';
 import { useThemeStore } from './store/themeStore';
 import { authApi } from './api/client';
@@ -112,6 +113,31 @@ function AppContent() {
 }
 
 function App() {
+  const setAuth = useAuthStore((state) => state.setAuth);
+
+  const [isAuthLoading, setIsAuthLoading] = React.useState(true);
+
+  useEffect(() => {
+    const initAuth = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setIsAuthLoading(false);
+        return;
+      }
+
+      try {
+        const userData = await authApi.getMe();
+        setAuth(userData.user, token);
+      } catch {
+        localStorage.removeItem('token');
+      } finally {
+        setIsAuthLoading(false);
+      }
+    };
+
+    initAuth();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <ChakraProvider value={system}>
