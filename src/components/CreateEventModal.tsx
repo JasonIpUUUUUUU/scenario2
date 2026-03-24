@@ -3,7 +3,8 @@ import { X, MapPin, AlignLeft, Repeat, Sparkles, Calendar, Clock, Users, Edit2 }
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { eventsApi } from '../api/client';
 import { toaster } from './ui/toaster';
-import { format, addHours, setHours, setMinutes } from 'date-fns';
+import { format, addHours, setHours, setMinutes, isSameDay } from 'date-fns';
+import { CustomCalendar } from './CustomCalendar';
 
 interface CreateEventModalProps {
   isOpen: boolean;
@@ -17,7 +18,7 @@ interface EventFormData {
   location: string;
   startDate: Date;
   startTime: string;
-  duration: number; // in minutes
+  duration: number;
   customDuration: boolean;
   customDurationValue: string;
   attendees: string[];
@@ -39,6 +40,7 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated }: CreateEven
   const [isClosing, setIsClosing] = useState(false);
   const [activeTab, setActiveTab] = useState<'smart' | 'manual'>('smart');
   const [smartInput, setSmartInput] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
@@ -47,9 +49,10 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated }: CreateEven
     mutationFn: eventsApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
-      toaster.success({
+      toaster.create({
         title: 'Event created!',
         description: 'Your event has been added to the calendar',
+        type: 'success',
       });
       resetForm();
       handleClose();
@@ -57,9 +60,10 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated }: CreateEven
     },
     onError: (error: any) => {
       console.error('Failed to create event:', error);
-      toaster.error({
+      toaster.create({
         title: 'Failed to create event',
         description: error.response?.data?.error?.message || 'Please try again',
+        type: 'error',
       });
     },
   });
@@ -93,7 +97,7 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated }: CreateEven
     const lowerInput = input.toLowerCase();
     const newFormData = { ...formData };
     
-    // Parse title (first part before any keywords)
+    // Parse title
     const titleMatch = input.match(/^([^@#!]+?)(?=\s+(?:tomorrow|next|at|on|with|@|#|!|for|$))/i);
     if (titleMatch) {
       newFormData.title = titleMatch[1].trim();
@@ -155,7 +159,7 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated }: CreateEven
       newFormData.startTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
     }
     
-    // Parse duration - look for "for X hours", "for X minutes", "X hr", etc.
+    // Parse duration
     const durationHourMatch = input.match(/for\s+(\d+)\s+hour[s]?/i);
     const durationHourMatch2 = input.match(/(\d+)\s+hour[s]?\s+long/i);
     const durationMinuteMatch = input.match(/for\s+(\d+)\s+minute[s]?/i);
@@ -195,35 +199,36 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated }: CreateEven
     e.preventDefault();
     
     if (!formData.title.trim()) {
-      toaster.error({
+      toaster.create({
         title: 'Title required',
         description: 'Please enter an event title',
+        type: 'error',
       });
       return;
     }
     
-    // Get duration value (handle custom duration)
     let durationMinutes = formData.duration;
     if (formData.customDuration) {
       const customValue = parseInt(formData.customDurationValue);
       if (isNaN(customValue) || customValue <= 0) {
-        toaster.error({
+        toaster.create({
           title: 'Invalid duration',
           description: 'Please enter a valid duration (minimum 5 minutes)',
+          type: 'error',
         });
         return;
       }
       durationMinutes = customValue;
       if (durationMinutes < 5) {
-        toaster.error({
+        toaster.create({
           title: 'Duration too short',
           description: 'Event duration must be at least 5 minutes',
+          type: 'error',
         });
         return;
       }
     }
     
-    // Combine date and time
     const startDateTime = new Date(formData.startDate);
     const [hours, minutes] = formData.startTime.split(':').map(Number);
     startDateTime.setHours(hours, minutes);
@@ -273,7 +278,6 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated }: CreateEven
 
   if (!isOpen && !isClosing) return null;
 
-  // Duration options in minutes
   const durationOptions = [
     { value: 15, label: '15 min' },
     { value: 30, label: '30 min' },
@@ -285,29 +289,6 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated }: CreateEven
     { value: 240, label: '4 hours' },
   ];
 
-  // Quick date options
-  const quickDates = [
-    { label: 'Today', getDate: () => new Date() },
-    { label: 'Tomorrow', getDate: () => {
-      const date = new Date();
-      date.setDate(date.getDate() + 1);
-      return date;
-    }},
-    { label: 'This Weekend', getDate: () => {
-      const date = new Date();
-      const dayOfWeek = date.getDay();
-      const daysUntilSaturday = (6 - dayOfWeek + 7) % 7;
-      date.setDate(date.getDate() + daysUntilSaturday);
-      return date;
-    }},
-    { label: 'Next Week', getDate: () => {
-      const date = new Date();
-      date.setDate(date.getDate() + 7);
-      return date;
-    }},
-  ];
-
-  // Format duration display
   const formatDurationDisplay = (minutes: number) => {
     if (minutes < 60) {
       return `${minutes} min`;
@@ -319,9 +300,19 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated }: CreateEven
     return `${hours.toFixed(1)} hours`;
   };
 
-  // Handle custom duration change
   const handleCustomDurationChange = (value: string) => {
     setFormData({ ...formData, customDurationValue: value });
+  };
+
+  // Get highlighted dates (events that already exist on that date)
+  const getHighlightedDates = () => {
+    // In a real app, you'd fetch events for the month
+    // For now, return some sample dates
+    return [
+      new Date(new Date().setDate(new Date().getDate() + 2)),
+      new Date(new Date().setDate(new Date().getDate() + 5)),
+      new Date(new Date().setDate(new Date().getDate() + 8)),
+    ];
   };
 
   return (
@@ -379,7 +370,7 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated }: CreateEven
         </div>
 
         {/* Content */}
-        <div className="relative z-10 p-6">
+        <div className="relative z-10 p-6 max-h-[70vh] overflow-y-auto">
           <form onSubmit={handleSubmit}>
             {/* Smart Input Mode */}
             {activeTab === 'smart' && (
@@ -430,53 +421,34 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated }: CreateEven
                   />
                 </div>
 
-                {/* Date and Time */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-text-secondary mb-1">Date</label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-                      <input
-                        type="date"
-                        value={format(formData.startDate, 'yyyy-MM-dd')}
-                        onChange={(e) => setFormData({ ...formData, startDate: new Date(e.target.value) })}
-                        className="w-full bg-white/[0.04] rounded-xl pl-10 pr-4 py-2.5 text-text-primary outline-none focus:ring-1 focus:ring-accent/50 transition-all"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-text-secondary mb-1">Time</label>
-                    <div className="relative">
-                      <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-                      <input
-                        type="time"
-                        value={formData.startTime}
-                        onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                        className="w-full bg-white/[0.04] rounded-xl pl-10 pr-4 py-2.5 text-text-primary outline-none focus:ring-1 focus:ring-accent/50 transition-all"
-                      />
-                    </div>
+                {/* Date Picker with Custom Calendar */}
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-1">Date</label>
+                  <CustomCalendar
+                    selectedDate={formData.startDate}
+                    onDateSelect={(date) => setFormData({ ...formData, startDate: date })}
+                    highlightedDates={getHighlightedDates()}
+                  />
+                </div>
+
+                {/* Time */}
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-1">Time</label>
+                  <div className="relative">
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                    <input
+                      type="time"
+                      value={formData.startTime}
+                      onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                      className="w-full bg-white/[0.04] rounded-xl pl-10 pr-4 py-2.5 text-text-primary outline-none focus:ring-1 focus:ring-accent/50 transition-all"
+                    />
                   </div>
                 </div>
 
-                {/* Quick Date Buttons */}
-                <div className="flex gap-2 flex-wrap">
-                  {quickDates.map((quick) => (
-                    <button
-                      key={quick.label}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, startDate: quick.getDate() })}
-                      className="px-3 py-1 text-xs rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-text-secondary hover:text-text-primary transition-all"
-                    >
-                      {quick.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Duration with Custom Input */}
+                {/* Duration */}
                 <div>
                   <label className="block text-sm font-medium text-text-secondary mb-2">Duration</label>
                   
-                  {/* Toggle between preset and custom */}
                   <div className="flex gap-2 mb-3">
                     <button
                       type="button"
@@ -503,7 +475,6 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated }: CreateEven
                     </button>
                   </div>
                   
-                  {/* Preset Duration Buttons */}
                   {!formData.customDuration && (
                     <div className="flex gap-2 flex-wrap">
                       {durationOptions.map((opt) => (
@@ -523,7 +494,6 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated }: CreateEven
                     </div>
                   )}
                   
-                  {/* Custom Duration Input */}
                   {formData.customDuration && (
                     <div className="space-y-2">
                       <div className="flex gap-3 items-center">
@@ -563,7 +533,7 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated }: CreateEven
                           </button>
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                         <button
                           type="button"
                           onClick={() => handleCustomDurationChange('30')}
@@ -606,7 +576,6 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated }: CreateEven
                     </div>
                   )}
                   
-                  {/* Duration Preview */}
                   <div className="mt-2 text-right">
                     <span className="text-xs text-text-muted">
                       Event will last: {' '}

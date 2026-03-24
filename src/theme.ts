@@ -1,5 +1,6 @@
 import { createSystem, defaultConfig, defineConfig } from '@chakra-ui/react';
 
+// Define color tokens for light and dark modes
 const config = defineConfig({
   theme: {
     tokens: {
@@ -16,6 +17,9 @@ const config = defineConfig({
           800: { value: '#072f77' },
           900: { value: '#042362' },
         },
+        accent: {
+          500: { value: '#d4775c' },
+        },
       },
       fonts: {
         heading: { value: 'Outfit, system-ui, sans-serif' },
@@ -24,11 +28,33 @@ const config = defineConfig({
     },
     semanticTokens: {
       colors: {
-        'bg.surface': { value: '#1a1917' },
-        'bg.elevated': { value: '#252320' },
-        'fg.primary': { value: '#f0ebe3' },
-        'fg.secondary': { value: '#968f84' },
-        'fg.muted': { value: '#5c574f' },
+        'bg.primary': {
+          value: { _light: '#ffffff', _dark: '#0f0e0d' },
+        },
+        'bg.secondary': {
+          value: { _light: '#f8f8f8', _dark: '#1a1917' },
+        },
+        'bg.elevated': {
+          value: { _light: '#f0f0f0', _dark: '#252320' },
+        },
+        'bg.card': {
+          value: { _light: '#ffffff', _dark: '#2c2926' },
+        },
+        'text.primary': {
+          value: { _light: '#1a1a1a', _dark: '#f0ebe3' },
+        },
+        'text.secondary': {
+          value: { _light: '#666666', _dark: '#968f84' },
+        },
+        'text.muted': {
+          value: { _light: '#999999', _dark: '#5c574f' },
+        },
+        'border.subtle': {
+          value: { _light: 'rgba(0,0,0,0.06)', _dark: 'rgba(255,245,230,0.06)' },
+        },
+        'border.medium': {
+          value: { _light: 'rgba(0,0,0,0.1)', _dark: 'rgba(255,245,230,0.10)' },
+        },
       },
     },
   },

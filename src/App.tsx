@@ -10,9 +10,11 @@ import { PendingInvites } from './components/PendingInvites';
 import { CreateEventButton } from './components/CreateEventButton';
 import { GroupView } from './components/GroupView';
 import { CreateEventModal } from './components/CreateEventModal';
+import { Settings } from './pages/Settings';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { useAuthStore } from './store/authStore';
+import { useThemeStore } from './store/themeStore';
 import { authApi } from './api/client';
 
 const queryClient = new QueryClient({
@@ -32,6 +34,18 @@ function AppContent() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const { user, isAuthenticated, isLoading, setAuth, logout, setLoading } = useAuthStore();
+  const { isDarkMode } = useThemeStore();
+
+  // Apply theme to document
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    } else {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -58,7 +72,7 @@ function AppContent() {
 
   if (!isInitialized || isLoading) {
     return (
-      <Center h="100vh" bg="#0f0e0d">
+      <Center h="100vh" bg="var(--bg-primary)">
         <Spinner size="xl" color="#d4775c" textDecorationThickness="4px" />
       </Center>
     );
@@ -70,11 +84,11 @@ function AppContent() {
 
   return (
     <>
-      <div className="min-h-screen bg-base flex items-center justify-center p-6 relative noise-texture">
+      <div className="min-h-screen bg-primary flex items-center justify-center p-6 relative noise-texture">
         <div
-          className="w-[96%] max-w-[1680px] h-[92vh] bg-surface rounded-[32px] border border-border-medium flex overflow-hidden relative"
+          className="w-[96%] max-w-[1680px] h-[92vh] bg-secondary rounded-[32px] border border-border-medium flex overflow-hidden relative"
           style={{
-            boxShadow: '0 0 0 1px rgba(255,245,230,0.03), 0 40px 80px -20px rgba(0,0,0,0.6)',
+            boxShadow: '0 0 0 1px var(--border-subtle), 0 40px 80px -20px rgba(0,0,0,0.6)',
           }}
         >
           <Sidebar activeView={activeView} onNavigate={setActiveView} />
@@ -82,23 +96,7 @@ function AppContent() {
             {activeView === 'calendar' && <Calendar />}
             {activeView === 'groups' && <GroupView />}
             {activeView === 'home' && <Calendar />}
-            {activeView === 'settings' && (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center">
-                  <h2 className="text-2xl font-display text-text-primary mb-2">Settings</h2>
-                  <p className="text-text-secondary">Coming soon...</p>
-                  <button
-                    onClick={() => {
-                      logout();
-                      window.location.href = '/login';
-                    }}
-                    className="mt-4 px-4 py-2 bg-accent hover:bg-accent-hover rounded-lg text-white transition-colors"
-                  >
-                    Logout
-                  </button>
-                </div>
-              </div>
-            )}
+            {activeView === 'settings' && <Settings />}
           </main>
           {activeView !== 'groups' && (
             <div className="w-[300px] p-6 flex flex-col gap-5 border-l border-border-subtle">
