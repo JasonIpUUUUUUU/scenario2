@@ -15,7 +15,28 @@ import type {
   RegisterResponse,
 } from '../types/api';
 
-const API_BASE_URL = '/api/v1';
+export type FriendshipStatus = 'pending' | 'accepted' | 'declined';
+export type FriendshipDirection = 'incoming' | 'outgoing';
+
+export interface UserSearchResult {
+  id: string;
+  email: string;
+  name: string;
+  time_zone: string;
+}
+
+export interface Friendship {
+  id: string;
+  requester_id: string;
+  addressee_id: string;
+  status: FriendshipStatus;
+  direction: FriendshipDirection;
+  other_user: UserSearchResult;
+  created_at: string;
+  updated_at: string;
+}
+
+const API_BASE_URL = 'http://8.208.53.133:8000/api/v1';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -36,10 +57,13 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const isLoginRequest = error.config?.url?.includes('/auth/login');
+
+    if (error.response?.status === 401 && !isLoginRequest) {
       localStorage.removeItem('token');
       window.location.href = '/login';
     }
+
     return Promise.reject(error);
   }
 );
@@ -60,12 +84,54 @@ export const authApi = {
 };
 
 export const usersApi = {
+  search: async (
+    q: string,
+    params?: { limit?: number }
+  ): Promise<{ users: UserSearchResult[] }> => {
+    const response = await apiClient.get('/users/search', { params: { q, ...params } });
+    return response.data;
+  },
+
   updateMe: async (data: Partial<User> & { password?: string }): Promise<{ user: User }> => {
     const response = await apiClient.patch('/users/me', data);
     return response.data;
   },
 };
 
+export const friendsApi = {
+  list: async (params?: { limit?: number; offset?: number }): Promise<{ friends: Friendship[] }> => {
+    const response = await apiClient.get('/friends', { params });
+    return response.data;
+  },
+
+  listRequests: async (params?: {
+    direction?: FriendshipDirection | 'all';
+    limit?: number;
+    offset?: number;
+  }): Promise<{ requests: Friendship[] }> => {
+    const response = await apiClient.get('/friends/requests', { params });
+    return response.data;
+  },
+
+  sendRequest: async (data: { user_id: string }): Promise<{ friendship: Friendship }> => {
+    const response = await apiClient.post('/friends/requests', data);
+    return response.data;
+  },
+
+  respondToRequest: async (
+    friendshipId: string,
+    data: { status: 'accepted' | 'declined' }
+  ): Promise<{ friendship: Friendship }> => {
+    const response = await apiClient.patch(`/friends/requests/${friendshipId}`, data);
+    return response.data;
+  },
+
+  remove: async (friendshipId: string): Promise<void> => {
+    await apiClient.delete(`/friends/${friendshipId}`);
+  },
+};
+
+// Groups API
 export const groupsApi = {
   create: async (data: { name: string }): Promise<{ group: Group }> => {
     const response = await apiClient.post('/groups', data);
@@ -154,5 +220,164 @@ export const eventsApi = {
   },
   delete: async (eventId: string): Promise<void> => {
     await apiClient.delete(`/events/${eventId}`);
+  },
+};
+
+// Group Events API
+export const groupEventsApi = {
+  // List group events
+  list: async (
+    groupId: string,
+    params?: {
+      start_ts?: string;
+      end_ts?: string;
+      limit?: number;
+      offset?: number;
+    }
+  ): Promise<{ events: GroupEvent[] }> => {
+    const response = await apiClient.get(`/groups/${groupId}/events`, { params });
+    return response.data;
+  },
+
+  // Create group event
+  create: async (
+    groupId: string,
+    data: {
+      start_ts: string;
+      end_ts: string;
+      title: string;
+      description?: string;
+      location?: string;
+    }
+  ): Promise<{ event: GroupEvent }> => {
+    const response = await apiClient.post(`/groups/${groupId}/events`, data);
+    return response.data;
+  },
+
+  // Get group event by ID
+  get: async (groupId: string, eventId: string): Promise<{ event: GroupEvent }> => {
+    const response = await apiClient.get(`/groups/${groupId}/events/${eventId}`);
+    return response.data;
+  },
+
+  // Update group event
+  update: async (
+    groupId: string,
+    eventId: string,
+    data: {
+      start_ts?: string;
+      end_ts?: string;
+      title?: string;
+      description?: string;
+      location?: string;
+    }
+  ): Promise<{ event: GroupEvent }> => {
+    const response = await apiClient.patch(`/groups/${groupId}/events/${eventId}`, data);
+    return response.data;
+  },
+
+  // Delete group event
+  delete: async (groupId: string, eventId: string): Promise<void> => {
+    await apiClient.delete(`/groups/${groupId}/events/${eventId}`);
+  },
+
+  // Participants
+  getParticipants: async (
+    groupId: string,
+    eventId: string
+  ): Promise<{ participants: GroupEventParticipant[] }> => {
+    const response = await apiClient.get(`/groups/${groupId}/events/${eventId}/participants`);
+    return response.data;
+  },
+
+  addParticipant: async (
+    groupId: string,
+    eventId: string,
+    data: { user_id: string; participant_role: 'required' | 'optional' }
+  ): Promise<{ participant: GroupEventParticipant }> => {
+    const response = await apiClient.post(
+      `/groups/${groupId}/events/${eventId}/participants`,
+      data
+    );
+    return response.data;
+  },
+
+  updateParticipant: async (
+    groupId: string,
+    eventId: string,
+    userId: string,
+    data: { participant_role?: 'required' | 'optional'; status?: 'pending' | 'accepted' | 'declined' }
+  ): Promise<{ participant: GroupEventParticipant }> => {
+    const response = await apiClient.patch(
+      `/groups/${groupId}/events/${eventId}/participants/${userId}`,
+      data
+    );
+    return response.data;
+  },
+
+  removeParticipant: async (groupId: string, eventId: string, userId: string): Promise<void> => {
+    await apiClient.delete(`/groups/${groupId}/events/${eventId}/participants/${userId}`);
+  },
+};
+
+// Preferred Periods API
+export const preferredPeriodsApi = {
+  // List preferred periods
+  list: async (params?: {
+    group_id?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ periods: PreferredPeriod[] }> => {
+    const response = await apiClient.get('/preferred-periods', { params });
+    return response.data;
+  },
+
+  // Create preferred period
+  create: async (data: {
+    group_id: string | null;
+    start_ts: string;
+    end_ts: string;
+    note?: string;
+  }): Promise<{ period: PreferredPeriod }> => {
+    const response = await apiClient.post('/preferred-periods', data);
+    return response.data;
+  },
+
+  // Update preferred period
+  update: async (
+    periodId: string,
+    data: {
+      start_ts?: string;
+      end_ts?: string;
+      note?: string;
+    }
+  ): Promise<{ period: PreferredPeriod }> => {
+    const response = await apiClient.patch(`/preferred-periods/${periodId}`, data);
+    return response.data;
+  },
+
+  // Delete preferred period
+  delete: async (periodId: string): Promise<void> => {
+    await apiClient.delete(`/preferred-periods/${periodId}`);
+  },
+};
+
+// Availability API
+export const availabilityApi = {
+  // Find matching time slots
+  findSlots: async (
+    groupId: string,
+    params: {
+      start_ts: string;
+      end_ts: string;
+      duration_minutes?: number;
+      step_minutes?: number;
+      max_results?: number;
+      participant_ids?: string[];
+      optional_participant_ids?: string[];
+    }
+  ): Promise<{ slots: AvailabilitySlot[] }> => {
+    const response = await apiClient.get(`/groups/${groupId}/availability`, { params });
+    return response.data;
   },
 };

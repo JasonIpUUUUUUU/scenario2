@@ -82,9 +82,10 @@ const getAttendees = (userName?: string, eventTitle?: string) => {
 interface WeekViewProps {
   currentDate?: Date;
   onEventClick?: (event: any) => void;
+  onTimeSlotClick?: (date: Date) => void;
 }
 
-export function WeekView({ currentDate = new Date(), onEventClick }: WeekViewProps) {
+export function WeekView({ currentDate = new Date(), onEventClick, onTimeSlotClick }: WeekViewProps) {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -196,12 +197,12 @@ export function WeekView({ currentDate = new Date(), onEventClick }: WeekViewPro
 
   // Handle time slot click for creating new event
   const handleTimeSlotClick = (day: Date, hour: number) => {
-    // In a real app, you would open the create event modal with pre-filled date/time
-    console.log('Create event at:', format(day, 'MMM d, yyyy'), hour);
-    toaster.info({
-      title: 'Create Event',
-      description: `Click "Create Event" button to add an event on ${format(day, 'MMM d')} at ${hour}:00`,
-    });
+    const date = new Date(day);
+    date.setHours(hour, 0, 0, 0);
+
+    if (onTimeSlotClick) {
+      onTimeSlotClick(date);
+    }
   };
 
   // Calculate position for event card

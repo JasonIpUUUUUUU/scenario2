@@ -19,6 +19,13 @@ export interface GroupMember {
   role: 'owner' | 'admin' | 'member';
   status: 'applied' | 'invited' | 'active';
   created_at: string;
+
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    time_zone: string;
+  };
 }
 
 export interface Event {

@@ -9,6 +9,7 @@ interface CreateEventModalProps {
   isOpen: boolean;
   onClose: () => void;
   onEventCreated?: () => void;
+  initialDate?: Date | null;
 }
 
 interface EventFormData {
@@ -23,7 +24,7 @@ interface EventFormData {
   attendees: string[];
 }
 
-export function CreateEventModal({ isOpen, onClose, onEventCreated }: CreateEventModalProps) {
+export function CreateEventModal({ isOpen, onClose, onEventCreated, initialDate }: CreateEventModalProps) {
   const [formData, setFormData] = useState<EventFormData>({
     title: '',
     description: '',
@@ -69,14 +70,13 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated }: CreateEven
       title: '',
       description: '',
       location: '',
-      startDate: new Date(),
-      startTime: '09:00',
+      startDate: initialDate || new Date(), // 👈 smarter default
+      startTime: initialDate ? format(initialDate, 'HH:mm') : '09:00',
       duration: 60,
       customDuration: false,
       customDurationValue: '60',
       attendees: [],
     });
-    setSmartInput('');
   };
 
   const handleClose = () => {
@@ -270,6 +270,16 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated }: CreateEven
       document.removeEventListener('keydown', handleEsc);
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (initialDate && isOpen) {
+      setFormData((prev) => ({
+        ...prev,
+        startDate: initialDate,
+        startTime: format(initialDate, 'HH:mm'),
+      }));
+    }
+  }, [initialDate, isOpen]);
 
   if (!isOpen && !isClosing) return null;
 

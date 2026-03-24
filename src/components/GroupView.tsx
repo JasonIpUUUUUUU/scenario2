@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import { UserPlus, MoreHorizontal, Shield, ChevronLeft, ArrowRight, Plus, Users } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { authApi, groupsApi } from '../api/client';
+import { CreateGroupModal } from './CreateGroupModal';
+import { InviteMemberModal } from './InviteMemberModal';
 
 /* ══════════════════════════════════════════════════
    Types & Data
@@ -25,56 +29,16 @@ interface Group {
   isFeatured?: boolean;
 }
 
-const groups: Group[] = [
-  {
-    id: 'uni-friends',
-    name: 'Uni Friends',
-    memberCount: 8,
-    lastActive: '2m ago',
-    accentColor: '#d4775c',
-    avatars: [
-      { initials: 'SP', color: '#b87ba8' },
-      { initials: 'EW', color: '#d4a843' },
-      { initials: 'LC', color: '#7a9ec4' },
-    ],
-    isFeatured: true,
-  },
-  {
-    id: 'gym-buddies',
-    name: 'Gym Buddies',
-    memberCount: 5,
-    lastActive: '1h ago',
-    accentColor: '#7db07e',
-    avatars: [
-      { initials: 'MR', color: '#6bbab4' },
-      { initials: 'TJ', color: '#d4a843' },
-      { initials: 'RK', color: '#7a9ec4' },
-    ],
-  },
-  {
-    id: 'work-team',
-    name: 'Work Team',
-    memberCount: 12,
-    lastActive: '15m ago',
-    accentColor: '#7a9ec4',
-    avatars: [
-      { initials: 'AH', color: '#d4775c' },
-      { initials: 'BL', color: '#b87ba8' },
-      { initials: 'CW', color: '#7db07e' },
-    ],
-  },
-];
-
-const members: Member[] = [
-  { id: '1', name: 'Jordan Davis', initials: 'JD', role: 'admin', isYou: true, sharingFull: true, avatarColor: '#6bbab4' },
-  { id: '2', name: 'Sam Peterson', initials: 'SP', role: 'admin', sharingFull: true, avatarColor: '#b87ba8' },
-  { id: '3', name: 'Emma Wilson', initials: 'EW', role: 'member', sharingFull: true, avatarColor: '#d4a843' },
-  { id: '4', name: 'Liam Chen', initials: 'LC', role: 'member', sharingFull: false, avatarColor: '#7a9ec4' },
-  { id: '5', name: 'Olivia Hart', initials: 'OH', role: 'member', sharingFull: true, avatarColor: '#d4775c' },
-  { id: '6', name: 'Noah Kim', initials: 'NK', role: 'member', sharingFull: false, avatarColor: '#7db07e' },
-  { id: '7', name: 'Ava Torres', initials: 'AT', role: 'member', sharingFull: true, avatarColor: '#b87ba8' },
-  { id: '8', name: 'Mia Brooks', initials: 'MB', role: 'member', sharingFull: true, avatarColor: '#d4a843' },
-];
+const mapGroupToUI = (group: any): Group => ({
+  id: group.id,
+  name: group.name,
+  memberCount: 1, // temp (fix later with members API)
+  lastActive: 'just now',
+  accentColor: '#d4775c',
+  avatars: [
+    { initials: 'YO', color: '#6bbab4' },
+  ],
+});
 
 /* ══════════════════════════════════════════════════
    Avatar Pile
@@ -169,9 +133,9 @@ function GroupCard({
    Create New Circle Card
    ══════════════════════════════════════════════════ */
 
-function CreateNewCard({ index }: { index: number }) {
+function CreateNewCard({ index, onClick }: { index: number; onClick: () => void }) {
   return (
-    <button
+    <button onClick={onClick}
       className="relative rounded-2xl border-[1.5px] border-dashed border-white/[0.08] hover:border-white/[0.16] flex flex-col items-center justify-center gap-4 transition-all duration-300 group animate-fade-in hover:bg-white/[0.02]"
       style={{
         animationDelay: `${100 + index * 80}ms`,
@@ -205,9 +169,52 @@ function GroupDetailView({
   onBack: () => void;
 }) {
   const [shareEventTitles, setShareEventTitles] = useState(true);
+  const [ isInviteOpen, setIsInviteOpen ] = useState(false);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['group-members', group.id],
+    queryFn: () => groupsApi.getMembers(group.id),
+  });
+
+  const { data: meData } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => authApi.getMe(),
+  });
+
+  const members: Member[] = (data?.members || []).map((m: any) => {
+    const isYou = m.user_id === meData?.user.id;
+
+    const name = m.user.name;
+
+    const initials = name
+      .split(' ')
+      .map((n: string) => n[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+
+    return {
+      id: m.user_id,
+      name,
+      initials,
+      role: m.role === 'owner' ? 'admin' : 'member',
+      isYou,
+      sharingFull: true,
+      avatarColor: '#6bbab4',
+    };
+  });
+
+  if (isLoading) {
+    return <div className="p-8 text-text-muted">Loading members...</div>;
+  }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
+      <InviteMemberModal
+        isOpen={isInviteOpen}
+        onClose={() => setIsInviteOpen(false)}
+        groupId={group.id}
+      />
       {/* Header */}
       <div className="px-8 pt-7 pb-5 flex items-center justify-between animate-fade-in">
         <div className="flex items-center gap-4">
@@ -222,12 +229,13 @@ function GroupDetailView({
               {group.name}
             </h1>
             <p className="text-[13px] text-text-secondary mt-1.5 font-light tracking-wide">
-              {group.memberCount} Members <span className="text-text-muted mx-1.5">&bull;</span> Created by You
+              {members.length} Members
             </p>
           </div>
         </div>
 
         <button
+          onClick={() => setIsInviteOpen(true)}
           className="h-10 bg-accent hover:bg-accent-hover text-white font-medium px-5 rounded-full flex items-center gap-2 text-[13px] transition-all duration-200"
           style={{
             boxShadow: '0 4px 20px -4px rgba(212,119,92,0.35), inset 0 1px 0 rgba(255,255,255,0.1)',
@@ -240,7 +248,7 @@ function GroupDetailView({
 
       {/* Member List */}
       <div className="flex-1 overflow-auto px-8 pb-6 scrollbar-hide">
-        <div className="bg-elevated/40 rounded-2xl border border-border-subtle overflow-hidden animate-fade-in" style={{ animationDelay: '100ms' }}>
+        <div className="bg-elevated/40 rounded-2xl border border-border-subtle overflow-hidden animate-fade-in">
           {members.map((member, i) => (
             <div
               key={member.id}
@@ -258,31 +266,18 @@ function GroupDetailView({
                 <span className="text-[14px] font-medium text-text-primary truncate">
                   {member.name}
                 </span>
+
                 {member.isYou && (
-                  <span className="text-[10px] text-text-muted font-medium tracking-wide">You</span>
+                  <span className="text-[10px] text-text-muted font-medium tracking-wide">
+                    You
+                  </span>
                 )}
+
                 {member.role === 'admin' && (
                   <span className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-md bg-ev-gold-bg text-ev-gold border border-ev-gold/20">
                     Admin
                   </span>
                 )}
-              </div>
-
-              <div className="flex items-center gap-2.5 mr-1">
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{
-                      backgroundColor: member.sharingFull ? '#7db07e' : '#d4a843',
-                      boxShadow: member.sharingFull
-                        ? '0 0 6px rgba(125,176,126,0.4)'
-                        : '0 0 6px rgba(212,168,67,0.4)',
-                    }}
-                  />
-                  <span className="text-[11px] text-text-muted font-light whitespace-nowrap">
-                    {member.sharingFull ? 'Full Calendar' : 'Busy/Free Only'}
-                  </span>
-                </div>
               </div>
 
               <button className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted/40 hover:text-text-secondary hover:bg-elevated opacity-0 group-hover:opacity-100 transition-all duration-200">
@@ -292,11 +287,8 @@ function GroupDetailView({
           ))}
         </div>
 
-        {/* Privacy Control Card */}
-        <div
-          className="mt-5 rounded-2xl border border-border-medium bg-elevated/30 p-5 animate-fade-in"
-          style={{ animationDelay: '600ms' }}
-        >
+        {/* Privacy Card (unchanged) */}
+        <div className="mt-5 rounded-2xl border border-border-medium bg-elevated/30 p-5 animate-fade-in">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-accent-muted flex items-center justify-center">
@@ -314,32 +306,17 @@ function GroupDetailView({
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <span className="text-[12px] text-text-secondary font-medium">
-                Share Event Titles
-              </span>
-              <button
-                onClick={() => setShareEventTitles(!shareEventTitles)}
-                className="relative w-11 h-6 rounded-full transition-all duration-300 flex-shrink-0"
+            <button
+              onClick={() => setShareEventTitles(!shareEventTitles)}
+              className="relative w-11 h-6 rounded-full"
+            >
+              <div
+                className="absolute top-[2px] w-5 h-5 rounded-full bg-white transition-all duration-300"
                 style={{
-                  backgroundColor: shareEventTitles ? '#d4775c' : '#252320',
-                  boxShadow: shareEventTitles
-                    ? '0 0 12px rgba(212,119,92,0.3), inset 0 1px 2px rgba(0,0,0,0.1)'
-                    : 'inset 0 1px 3px rgba(0,0,0,0.3)',
-                  border: shareEventTitles
-                    ? '1px solid rgba(224,138,111,0.3)'
-                    : '1px solid rgba(255,245,230,0.10)',
+                  left: shareEventTitles ? 'calc(100% - 22px)' : '2px',
                 }}
-              >
-                <div
-                  className="absolute top-[2px] w-5 h-5 rounded-full bg-white transition-all duration-300"
-                  style={{
-                    left: shareEventTitles ? 'calc(100% - 22px)' : '2px',
-                    boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
-                  }}
-                />
-              </button>
-            </div>
+              />
+            </button>
           </div>
         </div>
       </div>
@@ -353,6 +330,14 @@ function GroupDetailView({
 
 export function GroupView() {
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['groups'],
+    queryFn: () => groupsApi.list(),
+  });
+
+  const groups = (data?.groups || []).map(mapGroupToUI);
 
   if (selectedGroup) {
     return (
@@ -365,6 +350,12 @@ export function GroupView() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
+
+      <CreateGroupModal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+      />
+
       {/* Header */}
       <div className="px-8 pt-7 pb-2 animate-fade-in">
         <h1 className="font-display text-[32px] font-semibold text-text-primary tracking-[-0.02em] leading-none">
@@ -386,7 +377,9 @@ export function GroupView() {
               onClick={() => setSelectedGroup(group)}
             />
           ))}
-          <CreateNewCard index={groups.length} />
+          <CreateNewCard index={groups.length}
+                          onClick={() => setIsCreateOpen(true)} 
+                          />
         </div>
       </div>
     </div>
