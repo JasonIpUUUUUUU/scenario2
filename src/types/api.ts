@@ -11,6 +11,7 @@ export interface Group {
   owner_id: string;
   name: string;
   created_at: string;
+  memberCount?: number;
 }
 
 export interface GroupMember {

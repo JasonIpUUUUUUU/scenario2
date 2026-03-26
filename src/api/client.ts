@@ -197,6 +197,7 @@ export const eventsApi = {
     title: string;
     description?: string;
     location?: string;
+    group_id?: string;
   }): Promise<{ event: Event }> => {
     const response = await apiClient.post('/events', data);
     return response.data;

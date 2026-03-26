@@ -1,16 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, MapPin, AlignLeft, Repeat, Sparkles, Calendar, Clock, Users, Edit2 } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { eventsApi } from '../api/client';
+import { eventsApi, groupsApi } from '../api/client';
 import { toaster } from './ui/toaster';
 import { format, addHours, setHours, setMinutes, isSameDay } from 'date-fns';
 import { CustomCalendar } from './CustomCalendar';
+import { useQuery } from '@tanstack/react-query';
 
 interface CreateEventModalProps {
   isOpen: boolean;
   onClose: () => void;
   onEventCreated?: () => void;
   initialDate?: Date | null;
+  event?: any;
 }
 
 interface EventFormData {
@@ -23,9 +25,10 @@ interface EventFormData {
   customDuration: boolean;
   customDurationValue: string;
   attendees: string[];
+  groupId?: string;
 }
 
-export function CreateEventModal({ isOpen, onClose, onEventCreated, initialDate }: CreateEventModalProps) {
+export function CreateEventModal({ isOpen, onClose, onEventCreated, initialDate, event }: CreateEventModalProps) {
   const [formData, setFormData] = useState<EventFormData>({
     title: '',
     description: '',
@@ -36,6 +39,7 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated, initialDate 
     customDuration: false,
     customDurationValue: '60',
     attendees: [],
+    groupId: undefined,
   });
   
   const [isClosing, setIsClosing] = useState(false);
@@ -43,7 +47,20 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated, initialDate 
   const [smartInput, setSmartInput] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+
+  const { data: groupsData } = useQuery({
+    queryKey: ['groups'],
+    queryFn: () => groupsApi.list(),
+  });
+
+  const groups = groupsData?.groups || [];  
+
+  const { data: eventsData } = useQuery({
+    queryKey: ['events'],
+    queryFn: () => eventsApi.list(), // or whatever your endpoint is
+  });
 
   // Create event mutation
   const createEventMutation = useMutation({
@@ -69,6 +86,24 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated, initialDate 
     },
   });
 
+  // Update event mutation
+  const updateEventMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      eventsApi.update(id, data),
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+
+      toaster.create({
+        title: 'Event updated!',
+        description: 'Your changes have been saved',
+        type: 'success',
+      });
+
+      handleClose();
+    },
+  });
+
   const resetForm = () => {
     setFormData({
       title: '',
@@ -80,6 +115,7 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated, initialDate 
       customDuration: false,
       customDurationValue: '60',
       attendees: [],
+      groupId: undefined,
     });
   };
 
@@ -235,27 +271,45 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated, initialDate 
     
     const endDateTime = addHours(startDateTime, durationMinutes / 60);
     
-    createEventMutation.mutate({
+    const payload = {
       title: formData.title,
       description: formData.description,
       location: formData.location,
       start_ts: startDateTime.toISOString(),
       end_ts: endDateTime.toISOString(),
-    });
+      group_id: formData.groupId,
+    };
+
+    if (event?.id) {
+      updateEventMutation.mutate({ id: event.id, data: payload });
+    } else {
+      createEventMutation.mutate(payload);
+    }
   };
 
   // Handle click outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
-        handleClose();
-      }
+    const handleClickOutside = (e: MouseEvent) => {
+      if (!modalRef.current) return;
+
+      const target = e.target;
+
+      // ❗ Ensure target is a real DOM element
+      if (!(target instanceof HTMLElement)) return;
+
+      // ✅ Ignore clicks inside modal
+      if (modalRef.current.contains(target)) return;
+
+      // ✅ Ignore clicks inside calendar
+      if (target.closest('.calendar-root')) return;
+
+      handleClose();
     };
-    
+
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
-    
+
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
@@ -285,6 +339,25 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated, initialDate 
       }));
     }
   }, [initialDate, isOpen]);
+
+  useEffect(() => {
+    if (event && isOpen) {
+      const start = new Date(event.start_ts);
+
+      setFormData({
+        title: event.title || '',
+        description: event.description || '',
+        location: event.location || '',
+        startDate: start,
+        startTime: format(start, 'HH:mm'),
+        duration: (new Date(event.end_ts).getTime() - start.getTime()) / 60000,
+        customDuration: false,
+        customDurationValue: '60',
+        attendees: [],
+        groupId: event.group_id || undefined,
+      });
+    }
+  }, [event, isOpen]);
 
   if (!isOpen && !isClosing) return null;
 
@@ -316,13 +389,11 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated, initialDate 
 
   // Get highlighted dates (events that already exist on that date)
   const getHighlightedDates = () => {
-    // In a real app, you'd fetch events for the month
-    // For now, return some sample dates
-    return [
-      new Date(new Date().setDate(new Date().getDate() + 2)),
-      new Date(new Date().setDate(new Date().getDate() + 5)),
-      new Date(new Date().setDate(new Date().getDate() + 8)),
-    ];
+    if (!eventsData?.events) return [];
+
+    return eventsData.events.map((event: any) => {
+      return new Date(event.start_ts);
+    });
   };
 
   return (
@@ -434,11 +505,13 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated, initialDate 
                 {/* Date Picker with Custom Calendar */}
                 <div>
                   <label className="block text-sm font-medium text-text-secondary mb-1">Date</label>
-                  <CustomCalendar
-                    selectedDate={formData.startDate}
-                    onDateSelect={(date) => setFormData({ ...formData, startDate: date })}
-                    highlightedDates={getHighlightedDates()}
-                  />
+                    <div ref={calendarRef}>
+                    <CustomCalendar
+                      selectedDate={formData.startDate}
+                      onDateSelect={(date) => setFormData({ ...formData, startDate: date })}
+                      highlightedDates={getHighlightedDates()}
+                    />
+                    </div>
                 </div>
 
                 {/* Time */}
@@ -629,6 +702,28 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated, initialDate 
                     className="w-full bg-white/[0.04] rounded-xl px-4 py-2.5 text-text-primary placeholder:text-text-muted resize-none outline-none focus:ring-1 focus:ring-accent/50 transition-all"
                   />
                 </div>
+
+                {/* Group Invite */}
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-1">
+                    Invite Group (Optional)
+                  </label>
+
+                  <select
+                    value={formData.groupId || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, groupId: e.target.value || undefined })
+                    }
+                    className="w-full bg-white/[0.04] rounded-xl px-4 py-2.5 text-text-primary outline-none focus:ring-1 focus:ring-accent/50 transition-all"
+                  >
+                    <option value="">No group</option>
+                    {groups.map((g: any) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             )}
 
@@ -644,7 +739,7 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated, initialDate 
 
               <button
                 type="submit"
-                disabled={createEventMutation.isPending || !formData.title.trim()}
+                disabled={createEventMutation.isPending || updateEventMutation.isPending || !formData.title.trim()}
                 className="px-8 py-2.5 rounded-xl font-medium text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: 'linear-gradient(135deg, #d4775c 0%, #e08a6f 50%, #d4a843 100%)',
@@ -657,7 +752,7 @@ export function CreateEventModal({ isOpen, onClose, onEventCreated, initialDate 
                     Creating...
                   </span>
                 ) : (
-                  'Create Event'
+                  event ? 'Update Event' : 'Create Event'
                 )}
               </button>
             </div>

@@ -38,8 +38,8 @@ export const Login = () => {
     try {
       const response = await authApi.login(formData);
       localStorage.setItem('token', response.token);
+      const userData = await authApi.getMe();
       try {
-        const userData = await authApi.getMe();
         setAuth(userData.user, response.token);
       } catch {
         toaster.error({ title: 'Failed to fetch user' });
@@ -47,7 +47,7 @@ export const Login = () => {
       
       toaster.create({
         title: 'Login successful!',
-        description: `Welcome back, ${response.user.name}!`,
+        description: `Welcome back, ${userData.user.name}!`,
         type: 'success',
       });
       

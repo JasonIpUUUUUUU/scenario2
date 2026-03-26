@@ -12,6 +12,7 @@ export function Calendar() {
   const [currentView, setCurrentView] = useState<'Day' | 'Week' | 'Month'>('Week');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
 
   const handlePrevious = () => {
     if (currentView === 'Month') {
@@ -94,9 +95,16 @@ export function Calendar() {
       <div className="flex-1 overflow-auto px-8 pb-6 scrollbar-hide">
         {currentView === 'Week' && <WeekView currentDate={currentDate}
                                               onTimeSlotClick = {(date: Date) => {
+                                                setSelectedEvent(null);
                                                 setSelectedDate(date);
                                                 setIsModalOpen(true);
-                                              }} />}
+                                              }}
+                                              setSelectedEvent={setSelectedEvent} 
+                                              onEventClick={(event: any) => {
+                                                setSelectedEvent(event);
+                                                setSelectedDate(null);
+                                                setIsModalOpen(true);
+                                              }}/>}
         {currentView === 'Month' && (
           <div className="text-center text-text-secondary py-20">
             Month view coming soon...
@@ -110,8 +118,12 @@ export function Calendar() {
       </div>
       <CreateEventModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedEvent(null);
+        }}
         initialDate={selectedDate}
+        event={selectedEvent}
         />
     </div>
   );

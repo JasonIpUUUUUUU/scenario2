@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Box, Button, Input, VStack, Text, Dialog, Portal, HStack } from '@chakra-ui/react';
-import { groupsApi } from '../api/client';
+import { usersApi, groupsApi, eventsApi } from '../api/client';
 import { toaster } from '../components/ui/toaster';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import type { UserSearchResult } from '../api/client';
-import { usersApi } from '../api/client';
 import { useEffect } from 'react';
 
 export const Groups = () => {
@@ -28,6 +27,12 @@ export const Groups = () => {
     queryKey: ['groups'],
     queryFn: () => groupsApi.list(),
   });
+
+  // Fetch events
+  const { data: eventsData } = useQuery({
+    queryKey: ['events'],
+    queryFn: () => eventsApi.list(), // or whatever your endpoint is
+    });
 
   // Fetch members
   const { data: membersData } = useQuery({
@@ -170,8 +175,12 @@ export const Groups = () => {
                 
                 <Text fontWeight="bold">{group.name}</Text>
 
+                <Text fontSize="sm" color="gray.500" mt={1}>
+                {group.memberCount ?? 0} members
+                </Text>
+
                 <Button
-                mt={2}
+                mt={3}
                 onClick={() => {
                     setSelectedGroup(group.id);
                     setIsOpen(true);

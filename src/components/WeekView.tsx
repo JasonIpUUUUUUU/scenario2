@@ -56,8 +56,8 @@ const getEventColor = (eventId: string) => {
   return eventColors[hash % eventColors.length];
 };
 
-// Time slots from 8 AM to 9 PM (14 hours)
-const timeSlots = Array.from({ length: 14 }, (_, i) => i + 8);
+// Time slots from 12 AM to 12 PM (14 hours)
+const timeSlots = Array.from({ length: 24 }, (_, i) => i);
 
 // Get attendees for an event (in real app, this would come from the backend)
 const getAttendees = (userName?: string, eventTitle?: string) => {
@@ -83,9 +83,10 @@ interface WeekViewProps {
   currentDate?: Date;
   onEventClick?: (event: any) => void;
   onTimeSlotClick?: (date: Date) => void;
+  setSelectedEvent: (event: any | null) => void;
 }
 
-export function WeekView({ currentDate = new Date(), onEventClick, onTimeSlotClick }: WeekViewProps) {
+export function WeekView({ currentDate = new Date(), onEventClick, onTimeSlotClick, setSelectedEvent }: WeekViewProps) {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -124,6 +125,7 @@ export function WeekView({ currentDate = new Date(), onEventClick, onTimeSlotCli
     mutationFn: eventsApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
+      setSelectedEvent(null);
       toaster.success({
         title: 'Event deleted',
         description: 'The event has been removed from your calendar',
@@ -178,7 +180,11 @@ export function WeekView({ currentDate = new Date(), onEventClick, onTimeSlotCli
   const handleDeleteEvent = (eventId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (window.confirm('Are you sure you want to delete this event?')) {
-      deleteEventMutation.mutate(eventId);
+      deleteEventMutation.mutate(eventId, {
+        onSuccess: () => {
+          setSelectedEvent(null);
+        }
+      });
     }
   };
 
@@ -207,8 +213,7 @@ export function WeekView({ currentDate = new Date(), onEventClick, onTimeSlotCli
 
   // Calculate position for event card
   const getEventPosition = (hour: number, duration: number) => {
-    const startHour = hour;
-    const topPosition = (startHour - 8) * 72; // 72px per hour
+    const topPosition = (hour) * 72; // 72px per hour
     const height = duration * 72 - 4; // Subtract a few pixels for spacing
     return { top: `${topPosition + 2}px`, height: `${height}px` };
   };

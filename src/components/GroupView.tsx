@@ -29,14 +29,27 @@ interface Group {
   isFeatured?: boolean;
 }
 
+const getInitials = (name: string) => {
+  const words = name.trim().split(' ');
+
+  if (words.length === 1) {
+    return words[0][0].toUpperCase();
+  }
+
+  return (words[0][0] + words[1][0]).toUpperCase();
+};
+
 const mapGroupToUI = (group: any): Group => ({
   id: group.id,
   name: group.name,
-  memberCount: 1, // temp (fix later with members API)
+  memberCount: group.memberCount ?? 0,
   lastActive: 'just now',
   accentColor: '#d4775c',
   avatars: [
-    { initials: 'YO', color: '#6bbab4' },
+    {
+      initials: getInitials(group.name),
+      color: '#6bbab4',
+    },
   ],
 });
 
